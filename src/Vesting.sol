@@ -13,6 +13,12 @@ import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 contract Vesting is Ownable(msg.sender) {
     using SafeERC20 for IERC20;
 
+    error AlreadyDeposited();
+    error TotalAmountMustBeGreaterThanZero();
+    error DurationMustBeGreaterThanZero();
+    error VestingHasNotStartedYet();
+    error AllTokensHaveBeenClaimed();
+
     IERC20 public token;
     address public payer;
     address public receiver;
@@ -38,9 +44,9 @@ contract Vesting is Ownable(msg.sender) {
     }
 
     function deposit(uint256 _totalAmount, uint256 _duration) external onlyPayer {
-        require(token.balanceOf(address(this)) == 0, "Already deposited");
-        require(_totalAmount > 0, "Total amount must be greater than 0");
-        require(_duration > 0, "Duration must be greater than 0");
+        if (token.balanceOf(address(this)) != 0) revert AlreadyDeposited();
+        if (_totalAmount == 0) revert TotalAmountMustBeGreaterThanZero();
+        if (_duration == 0) revert DurationMustBeGreaterThanZero();
         totalAmount = _totalAmount;
         duration = _duration;
         startTime = block.timestamp;
@@ -48,8 +54,8 @@ contract Vesting is Ownable(msg.sender) {
     }
 
     function claim() external onlyReceiver {
-        require(block.timestamp >= startTime, "Vesting has not started yet");
-        require(claimedAmount < totalAmount, "All tokens have been claimed");
+        if (block.timestamp < startTime) revert VestingHasNotStartedYet();
+        if (claimedAmount >= totalAmount) revert AllTokensHaveBeenClaimed();
         uint256 timePassed = block.timestamp - startTime;
         if (timePassed > duration) {
             uint256 amountToClaim = totalAmount - claimedAmount;
